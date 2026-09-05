@@ -49,28 +49,25 @@
     position: relative;
 }
 
-/* التكستاريا الحقيقية: النص بيتخفى بصريًا بس السلوك زي ما هو */
+/* التكستاريا الحقيقية: مخفية بصريًا 100% (مش بس لون النص شفاف).
+   بنستخدم opacity:0 بدل color:transparent لأن opacity:0 بتضمن إن
+   *كل حاجة* جوه العنصر (النص، الكاريت، أي كاريت وهمي بيرسمه نظام
+   IME على الموبايل، أي "حاشية اختيار كلمة" بترسمها بعض المتصفحات)
+   تختفي تمامًا — مفيش أي احتمال يبان حرف واحد من التوكن الخام تحت
+   أي ظرف. العنصر لسه شغال وظيفيًا 100% (فوكس، كتابة، حذف، .value)
+   لأنه لسه موجود فعليًا في الـ DOM وبنفس المكان والحجم بالظبط،
+   إحنا بس مخفيينه بصريًا. الكاريت الظاهر للمستخدم بقى مرسوم يدويًا
+   جوه الـ overlay نفسه (شوف .cz-fake-caret تحت). */
 .conv-textarea.cz-has-overlay {
-    color: transparent;
-    caret-color: var(--text, #E9F2EE);
+    opacity: 0;
     position: relative;
     z-index: 1;
     background: transparent;
 }
 
-/* لما تحدد/تعمل Select على نص فيه توكن، بعض المتصفحات (زي Edge)
-   بتفرض لون افتراضي للنص المحدد من غير ما تحترم color:transparent
-   الأصلي — فيبان الترميز الخام لحظة التحديد بس. السطرين دول بيجبروا
-   لون النص المحدد يفضل شفاف برضو، مع الاحتفاظ بخلفية تظليل عادية
-   عشان المستخدم لسه يحس إنه حدد حاجة */
-.conv-textarea.cz-has-overlay::selection {
-    color: transparent;
-    background: rgba(37, 217, 160, 0.35);
-}
-.conv-textarea.cz-has-overlay::-moz-selection {
-    color: transparent;
-    background: rgba(37, 217, 160, 0.35);
-}
+/* حتى لو حصل تحديد نص جوه التكستاريا المخفية (بضغطة مطولة على
+   الموبايل مثلاً)، ما فيش داعي لأي معالجة تلوين هنا لأن العنصر
+   كله opacity:0 أصلاً — مفيش حاجة تبان سواء كان فيه تحديد أو لأ. */
 
 .cz-textarea-overlay {
     position: absolute;
@@ -87,6 +84,24 @@
 
 .cz-textarea-overlay .cz-emoji-img {
     vertical-align: -6px;
+}
+
+/* الكاريت الوهمي: بما إن التكستاريا الحقيقية بقت opacity:0 (مش
+   بس نصها شفاف)، الكاريت الحقيقي بتاعها اختفى هو كمان. عشان
+   المستخدم يفضل شايف "خط الكتابة" وهو بيكتب، بنرسم كاريت وهمي
+   هنا جوه الـ overlay، وبنحرّكه برمجيًا لمكان الكتابة الحقيقي
+   (selectionStart) في كل مرة يتغير فيها المحتوى أو مكان المؤشر. */
+.cz-fake-caret {
+    position: absolute;
+    width: 1px;
+    background: var(--text, #E9F2EE);
+    animation: cz-caret-blink 1s step-end infinite;
+    pointer-events: none;
+}
+
+@keyframes cz-caret-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
 }
 
 /* عزل اتجاه لكل صورة إيموجي بمفردها، عشان وجودها جوه جملة عربي

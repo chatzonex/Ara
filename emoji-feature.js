@@ -163,6 +163,7 @@
        ================================================= */
     var overlayEl = null;
     var overlayTextarea = null;
+    var fakeCaretEl = null;
 
     function ensureOverlay() {
         var textarea = $('convTextarea');
@@ -176,6 +177,17 @@
         overlay.className = 'cz-textarea-overlay';
         overlay.id = 'czTextareaOverlay';
         wrap.insertBefore(overlay, textarea.nextSibling);
+
+        // بما إن التكستاريا الحقيقية بقت opacity:0 (مش ظاهرة خالص)،
+        // أي كليك/لمسة المستخدم بيعملها على مكانها المفروض توصل
+        // للتكستاريا نفسها عشان الكيبورد يفتح ويتحط فيها فوكس. الـ
+        // overlay فوقها بصريًا بس pointer-events:none في الـ CSS
+        // الأصلي، فده أصلاً بيحصل تلقائيًا (اللمسة بتعدي للي تحتها).
+        // كاريت وهمي مرسوم فوق كل ده يوضح للمستخدم مكان الكتابة.
+        var caret = document.createElement('div');
+        caret.className = 'cz-fake-caret';
+        overlay.appendChild(caret);
+        fakeCaretEl = caret;
 
         textarea.classList.add('cz-has-overlay');
 
@@ -191,8 +203,13 @@
         textarea.addEventListener('input', function () {
             syncOverlayContent();
             requestAnimationFrame(syncOverlayGeometry);
+            requestAnimationFrame(syncFakeCaret);
         });
         textarea.addEventListener('scroll', syncOverlayScroll);
+        textarea.addEventListener('click', syncFakeCaret);
+        textarea.addEventListener('keyup', syncFakeCaret);
+        textarea.addEventListener('focus', syncFakeCaret);
+        textarea.addEventListener('blur', hideFakeCaret);
         window.addEventListener('resize', syncOverlayGeometry);
 
         // بعد الإرسال (زرار أو Enter) التكستاريا بتتفضى غالبًا
@@ -203,6 +220,7 @@
             requestAnimationFrame(function () {
                 syncOverlayContent();
                 requestAnimationFrame(syncOverlayGeometry);
+                requestAnimationFrame(syncFakeCaret);
             });
         }
         if (sendBtn) sendBtn.addEventListener('click', syncSoonAfterSend);
@@ -257,6 +275,7 @@
         var newPos = target.index;
         textarea.setSelectionRange(newPos, newPos);
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        requestAnimationFrame(syncFakeCaret);
 
         if (navigator.vibrate) {
             try { navigator.vibrate(4); } catch (e2) {}
@@ -309,6 +328,79 @@
         if (!overlayEl || !overlayTextarea) return;
         overlayEl.scrollTop = overlayTextarea.scrollTop;
         overlayEl.scrollLeft = overlayTextarea.scrollLeft;
+    }
+
+    /* ============ حساب وتحريك الكاريت الوهمي ============
+       بما إن التكستاريا الحقيقية opacity:0، الكاريت الأصلي بتاعها
+       مبيبانش. عشان نعرف إحداثيات مكان الكتابة بالظبط (بعد أي
+       صور إيموجي قبله)، بنستخدم "مرآة" مخفية: div بنفس فونت/عرض/
+       padding التكستاريا بالظبط، بنحط فيه نفس النص لحد موضع
+       المؤشر بس (متحول لصور برضو عشان نحسب عرض الصورة صح مش
+       عرض التوكن النصي)، وبعد آخر حرف بنحط span فاضي ونقرا
+       مكانه (offsetLeft/offsetTop) — ده مكان الكاريت بالظبط. */
+    var mirrorEl = null;
+
+    function ensureMirror() {
+        if (mirrorEl) return mirrorEl;
+        var m = document.createElement('div');
+        m.style.position = 'absolute';
+        m.style.visibility = 'hidden';
+        m.style.pointerEvents = 'none';
+        m.style.whiteSpace = 'pre-wrap';
+        m.style.wordBreak = 'break-word';
+        m.style.boxSizing = 'border-box';
+        m.style.top = '0';
+        m.style.left = '-9999px';
+        document.body.appendChild(m);
+        mirrorEl = m;
+        return m;
+    }
+
+    function hideFakeCaret() {
+        if (fakeCaretEl) fakeCaretEl.style.opacity = '0';
+    }
+
+    function syncFakeCaret() {
+        if (!fakeCaretEl || !overlayTextarea || !overlayEl) return;
+        if (document.activeElement !== overlayTextarea) {
+            hideFakeCaret();
+            return;
+        }
+        fakeCaretEl.style.opacity = '';
+
+        var textarea = overlayTextarea;
+        var pos = textarea.selectionStart != null ? textarea.selectionStart : textarea.value.length;
+        var raw = textarea.value || '';
+        var before = raw.slice(0, pos);
+
+        var mirror = ensureMirror();
+        var cs = window.getComputedStyle(textarea);
+        ['fontSize', 'fontFamily', 'fontWeight', 'lineHeight', 'letterSpacing',
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+            'textAlign', 'direction'].forEach(function (prop) {
+            mirror.style[prop] = cs[prop];
+        });
+        mirror.style.width = textarea.clientWidth + 'px';
+
+        // بنحول النص لحد موضع المؤشر لصور (زي renderTextWithEmoji)
+        // عشان الحساب يبقى دقيق حتى لو فيه إيموجي قبل المؤشر.
+        var baseSize = parseFloat(cs.fontSize) || 20;
+        mirror.innerHTML = renderTextWithEmoji(before, Math.round(baseSize * 1.25));
+        var marker = document.createElement('span');
+        marker.textContent = '\u200b'; // zero-width، بس عشان نقدر ناخد إحداثياته
+        mirror.appendChild(marker);
+
+        var caretLeft = marker.offsetLeft;
+        var caretTop = marker.offsetTop;
+        var lineHeight = parseFloat(cs.lineHeight) || (baseSize * 1.3);
+
+        fakeCaretEl.style.left = caretLeft + 'px';
+        fakeCaretEl.style.top = (caretTop + 1) + 'px';
+        fakeCaretEl.style.height = Math.max(lineHeight * 0.72, baseSize) + 'px';
+
+        // نراعي سكرول التكستاريا (لو النص أطول من ارتفاعها)
+        fakeCaretEl.style.transform = 'translate(0, -' + textarea.scrollTop + 'px)';
     }
 
     /* ============ [2] بيكر الإيموجي (أفقي، سحب باليد) ============ */
@@ -536,6 +628,7 @@
         // نطلق حدث input عشان أي listener موجود (زي تكبير التكستاريا) يشتغل
         // وعشان طبقة العرض الحي تتزامن فورًا
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        requestAnimationFrame(syncFakeCaret);
 
         if (navigator.vibrate) {
             try { navigator.vibrate(6); } catch (e) {}
@@ -619,6 +712,16 @@
             });
         }
         watchMessagesContainer();
+
+        // selectionchange بيتفعل مع أي تحريك للمؤشر حتى من غير كتابة
+        // (زي الأسهم، أو لمس/سحب المؤشر على الموبايل) — بنستخدمه
+        // عشان الكاريت الوهمي يفضل متزامن مع مكان الكتابة الحقيقي
+        // في كل الحالات دي، مش بس وقت input.
+        document.addEventListener('selectionchange', function () {
+            if (overlayTextarea && document.activeElement === overlayTextarea) {
+                syncFakeCaret();
+            }
+        });
     }
 
     if (document.readyState === 'loading') {
