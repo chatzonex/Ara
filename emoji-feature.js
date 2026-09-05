@@ -33,7 +33,6 @@
     var MANIFEST_URL = 'emoji-manifest.json';
     var TOKEN_PREFIX = '[[czemoji:';
     var TOKEN_SUFFIX = ']]';
-    var TOKEN_RE = /\[\[czemoji:([a-zA-Z0-9_]+)\]\]/g;
     // علامات عزل اتجاه يونيكود (Unicode Bidi Isolate) بتتحط حوالين
     // كل توكن. المشكلة الأصلية: حروف التوكن الإنجليزية ("czemoji")
     // لما تتحط جوه جملة عربي (RTL)، المتصفح بيتعامل معاها كأنها
@@ -44,6 +43,17 @@
     // حواليه" فمبيأثرش في ترتيب أي حاجة تانية ولا بيتأثر بيها.
     var ISOLATE_START = '\u2066'; // LRI - Left-to-Right Isolate
     var ISOLATE_END = '\u2069';   // PDI - Pop Directional Isolate
+    // مهم جدًا: الـ regex لازم ياخد علامتي العزل دول *جوه* حدود المطابقة
+    // نفسها (مش بس [[czemoji:...]])، وإلا وقت الاستبدال بالصورة أو وقت
+    // الحذف هيفضل فيه \u2066 و/أو \u2069 عالقين كنص خفي غريب في العرض
+    // أو في محتوى التكستاريا — وده كان بالظبط سبب ظهور "الرموز الغريبة"
+    // حوالين الإيموجي وسبب إن الحذف كان مش بيمسح التوكن بالكامل كوحدة.
+    var ISOLATE_START_ESC = '\\u2066';
+    var ISOLATE_END_ESC = '\\u2069';
+    var TOKEN_RE = new RegExp(
+        ISOLATE_START_ESC + '?' + '\\[\\[czemoji:([a-zA-Z0-9_]+)\\]\\]' + ISOLATE_END_ESC + '?',
+        'g'
+    );
 
     var manifestData = null; // { size, cols, rows, items: [{id,x,y}] }
     var manifestById = {};   // id -> {x,y}
@@ -198,9 +208,59 @@
         if (sendBtn) sendBtn.addEventListener('click', syncSoonAfterSend);
         textarea.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) syncSoonAfterSend();
+            else handleEmojiTokenDeletion(e, textarea);
         });
 
         return overlay;
+    }
+
+    /* ============ حذف التوكن كوحدة واحدة بضغطة Backspace/Delete ============
+       من غير المعالجة دي، Backspace كان بيمسح حرف واحد بس من التوكن في كل
+       ضغطة (وأول حاجة بتتمسح هي علامة العزل \u2069 نفسها، مش جزء من
+       [[czemoji:...]])، فكان المستخدم لازم يدوس مرات كتير عشان يمسح
+       إيموجي واحد، وكان بيشوف بقايا حروف التوكن الخام أثناء كده.
+       هنا: لو الحذف هيلمس توكن إيموجي كامل (بعلامات العزل حواليه)،
+       بنمنع السلوك الافتراضي ونمسح التوكن بالكامل بضغطة واحدة، زي أي
+       تطبيق شات بيتعامل مع الإيموجي كوحدة واحدة غير قابلة للتقسيم. */
+    function handleEmojiTokenDeletion(e, textarea) {
+        if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+
+        var val = textarea.value;
+        var start = textarea.selectionStart;
+        var end = textarea.selectionEnd;
+
+        // لو فيه تحديد نص (مش مجرد مؤشر)، سيب المتصفح يتعامل عادي
+        if (start !== end) return;
+
+        // نبني نسخة من الـ regex بدون علم /g عشان نقدر نستخدمها في exec
+        // بأمان من غير مشاكل lastIndex بين استدعاءات مختلفة
+        var re = new RegExp(TOKEN_RE.source, 'g');
+        var m;
+        var target = null;
+
+        while ((m = re.exec(val)) !== null) {
+            if (e.key === 'Backspace' && m.index < start && (m.index + m[0].length) >= start) {
+                target = m;
+                break;
+            }
+            if (e.key === 'Delete' && m.index <= start && (m.index + m[0].length) > start) {
+                target = m;
+                break;
+            }
+        }
+
+        if (!target) return; // مفيش توكن ملامس للمؤشر، سيب السلوك الافتراضي
+
+        e.preventDefault();
+        var newVal = val.slice(0, target.index) + val.slice(target.index + target[0].length);
+        textarea.value = newVal;
+        var newPos = target.index;
+        textarea.setSelectionRange(newPos, newPos);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+        if (navigator.vibrate) {
+            try { navigator.vibrate(4); } catch (e2) {}
+        }
     }
 
     function syncOverlayGeometry() {
