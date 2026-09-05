@@ -58,6 +58,20 @@
     background: transparent;
 }
 
+/* لما تحدد/تعمل Select على نص فيه توكن، بعض المتصفحات (زي Edge)
+   بتفرض لون افتراضي للنص المحدد من غير ما تحترم color:transparent
+   الأصلي — فيبان الترميز الخام لحظة التحديد بس. السطرين دول بيجبروا
+   لون النص المحدد يفضل شفاف برضو، مع الاحتفاظ بخلفية تظليل عادية
+   عشان المستخدم لسه يحس إنه حدد حاجة */
+.conv-textarea.cz-has-overlay::selection {
+    color: transparent;
+    background: rgba(37, 217, 160, 0.35);
+}
+.conv-textarea.cz-has-overlay::-moz-selection {
+    color: transparent;
+    background: rgba(37, 217, 160, 0.35);
+}
+
 .cz-textarea-overlay {
     position: absolute;
     pointer-events: none;
@@ -128,6 +142,45 @@
     background: var(--glass-border, rgba(255,255,255,0.2));
     margin: 2px auto 10px;
     flex-shrink: 0;
+}
+
+/* ===== بار التبويبات (الكل / الأكثر استخدامًا) — دايمًا فوق
+   الشبكة لأنه بييجي قبلها في ترتيب الـ flex column، فمستحيل
+   يتداخل معاها ================================================= */
+.cz-emoji-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 2px 14px 10px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.08));
+    margin-bottom: 10px;
+}
+
+.cz-emoji-tab {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    color: var(--text-dim, #8A9691);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.cz-emoji-tab.cz-active {
+    background: var(--accent, #25D9A0);
+    color: #06231A;
+}
+
+.cz-emoji-empty {
+    width: 100%;
+    padding: 34px 10px;
+    text-align: center;
+    color: var(--text-dim, #8A9691);
+    font-size: 13px;
 }
 
 /* ===== شبكة الإيموجي: أفقية، 4 صفوف ثابتة، تتحرك بالسحب يمين/شمال ===== */

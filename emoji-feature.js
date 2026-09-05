@@ -254,6 +254,34 @@
     /* ============ [2] بيكر الإيموجي (أفقي، سحب باليد) ============ */
     var pickerEl = null;
     var scrollEl = null;
+    var gridEl = null;
+    var activeTab = 'all'; // 'all' | 'recent'
+
+    /* ============ عداد استخدام الإيموجي (محفوظ على الجهاز) ============ */
+    var USAGE_KEY = 'cz_emoji_usage_v1';
+
+    function loadUsage() {
+        try {
+            var raw = localStorage.getItem(USAGE_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) { return {}; }
+    }
+
+    function bumpUsage(emojiId) {
+        try {
+            var usage = loadUsage();
+            usage[emojiId] = (usage[emojiId] || 0) + 1;
+            localStorage.setItem(USAGE_KEY, JSON.stringify(usage));
+        } catch (e) { /* لو التخزين مقفول، منعملش حاجة، البيكر لسه شغال عادي */ }
+    }
+
+    // بيرجع IDs الإيموجي اللي اتستخدمت قبل كده، مرتبة من الأكتر استخدامًا للأقل
+    function getMostUsedIds() {
+        var usage = loadUsage();
+        return Object.keys(usage)
+            .filter(function (id) { return usage[id] > 0 && manifestById[id]; })
+            .sort(function (a, b) { return usage[b] - usage[a]; });
+    }
 
     function buildPicker() {
         if (pickerEl) return pickerEl;
@@ -268,6 +296,30 @@
         var handle = document.createElement('div');
         handle.className = 'cz-emoji-picker-handle';
         sheet.appendChild(handle);
+
+        /* بار التبويبات: لازم يتحط قبل شبكة الإيموجي في الـ DOM
+           عشان الـ flex column يرتبهم فوق (البار) وتحت (الشبكة)
+           تلقائيًا من غير أي تداخل بينهم */
+        var tabs = document.createElement('div');
+        tabs.className = 'cz-emoji-tabs';
+
+        var tabAll = document.createElement('button');
+        tabAll.type = 'button';
+        tabAll.className = 'cz-emoji-tab cz-active';
+        tabAll.textContent = 'الكل';
+        tabAll.dataset.tab = 'all';
+        tabAll.addEventListener('click', function () { switchTab('all'); });
+
+        var tabRecent = document.createElement('button');
+        tabRecent.type = 'button';
+        tabRecent.className = 'cz-emoji-tab';
+        tabRecent.textContent = 'الأكثر استخدامًا';
+        tabRecent.dataset.tab = 'recent';
+        tabRecent.addEventListener('click', function () { switchTab('recent'); });
+
+        tabs.appendChild(tabAll);
+        tabs.appendChild(tabRecent);
+        sheet.appendChild(tabs);
 
         var scroller = document.createElement('div');
         scroller.className = 'cz-emoji-picker-scroll';
@@ -290,7 +342,19 @@
 
         pickerEl = overlay;
         scrollEl = scroller;
+        gridEl = grid;
         return overlay;
+    }
+
+    function switchTab(tab) {
+        if (activeTab === tab) return;
+        activeTab = tab;
+        var tabEls = pickerEl ? pickerEl.querySelectorAll('.cz-emoji-tab') : [];
+        tabEls.forEach(function (t) {
+            t.classList.toggle('cz-active', t.dataset.tab === tab);
+        });
+        if (scrollEl) scrollEl.scrollLeft = 0; // رجّع للبداية كل ما تغيّر تبويب
+        renderGrid();
     }
 
     /* سحب أفقي باليد/بالماوس بدل السكرول العادي (بيمنع فتح
@@ -340,18 +404,34 @@
         }, true);
     }
 
-    function populateGrid() {
-        var grid = $('czEmojiPickerGrid');
+    function renderGrid() {
+        var grid = gridEl || $('czEmojiPickerGrid');
         if (!grid || !manifestData) return;
-        if (grid.childElementCount > 0) return; // اتبنى قبل كده
+        grid.innerHTML = '';
+
+        var ids = (activeTab === 'recent')
+            ? getMostUsedIds()
+            : manifestData.items.map(function (it) { return it.id; });
+
+        if (activeTab === 'recent' && ids.length === 0) {
+            grid.style.display = 'flex';
+            grid.style.minWidth = '100%';
+            var empty = document.createElement('div');
+            empty.className = 'cz-emoji-empty';
+            empty.textContent = 'لسه مفيش إيموجي استخدمته قبل كده';
+            grid.appendChild(empty);
+            return;
+        }
+        grid.style.display = '';
+        grid.style.minWidth = '';
 
         var frag = document.createDocumentFragment();
-        manifestData.items.forEach(function (it) {
+        ids.forEach(function (id) {
             var cell = document.createElement('div');
             cell.className = 'cz-emoji-picker-cell';
-            cell.innerHTML = buildEmojiSpanHTML(it.id, 34);
+            cell.innerHTML = buildEmojiSpanHTML(id, 34);
             cell.addEventListener('click', function () {
-                insertEmojiToken(it.id);
+                insertEmojiToken(id);
             });
             frag.appendChild(cell);
         });
@@ -366,7 +446,7 @@
             textarea.blur();
         }
         loadManifest().then(function () {
-            populateGrid();
+            renderGrid();
             overlay.classList.add('open');
         });
         if (emojiBtn) emojiBtn.classList.add('cz-active');
@@ -385,6 +465,7 @@
     function insertEmojiToken(emojiId) {
         var textarea = $('convTextarea');
         if (!textarea) return;
+        bumpUsage(emojiId);
         var token = ISOLATE_START + TOKEN_PREFIX + emojiId + TOKEN_SUFFIX + ISOLATE_END;
         var start = textarea.selectionStart != null ? textarea.selectionStart : textarea.value.length;
         var end = textarea.selectionEnd != null ? textarea.selectionEnd : textarea.value.length;
