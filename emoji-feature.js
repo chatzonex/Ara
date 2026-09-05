@@ -244,6 +244,9 @@
             });
         }
         if (sendBtn) sendBtn.addEventListener('click', syncSoonAfterSend);
+        textarea.addEventListener('beforeinput', function (e) {
+            handleBeforeInputDeletion(e, textarea);
+        });
         textarea.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) syncSoonAfterSend();
             else handleEmojiTokenDeletion(e, textarea);
@@ -252,54 +255,86 @@
         return overlay;
     }
 
-    /* ============ حذف التوكن كوحدة واحدة بضغطة Backspace/Delete ============
-       من غير المعالجة دي، Backspace كان بيمسح حرف واحد بس من التوكن في كل
-       ضغطة (وأول حاجة بتتمسح هي علامة العزل \u2069 نفسها، مش جزء من
-       [[czemoji:...]])، فكان المستخدم لازم يدوس مرات كتير عشان يمسح
-       إيموجي واحد، وكان بيشوف بقايا حروف التوكن الخام أثناء كده.
+    /* ============ حذف التوكن كوحدة واحدة (جميع طرق الحذف) ============
+       من غير المعالجة دي، أي حذف كان بيمسح حرف واحد بس من التوكن في كل
+       مرة (وأول حاجة بتتمسح هي علامة العزل \u2069 نفسها، مش جزء من
+       [[czemoji:...]])، فكان المستخدم لازم يكرر الحذف مرات كتير عشان
+       يمسح إيموجي واحد، وكان بيشوف بقايا حروف التوكن الخام أثناء كده.
        هنا: لو الحذف هيلمس توكن إيموجي كامل (بعلامات العزل حواليه)،
-       بنمنع السلوك الافتراضي ونمسح التوكن بالكامل بضغطة واحدة، زي أي
-       تطبيق شات بيتعامل مع الإيموجي كوحدة واحدة غير قابلة للتقسيم. */
-    function handleEmojiTokenDeletion(e, textarea) {
-        if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+       بنمنع السلوك الافتراضي ونمسح التوكن بالكامل دفعة واحدة، زي أي
+       تطبيق شات بيتعامل مع الإيموجي كوحدة واحدة غير قابلة للتقسيم.
 
-        var val = textarea.value;
-        var start = textarea.selectionStart;
-        var end = textarea.selectionEnd;
+       ملحوظة مهمة (1): المؤشر ممكن يوصل *جوه* التوكن نفسه (بين حروفه)
+       مش بس على حافته — ده بيحصل لو المستخدم لمس/دبل-كليك جوه المنطقة
+       اللي بتعرض فيها الصورة (لأن التوكن الخام أطول بصريًا من عرض
+       الصورة المعروضة)، أو لو حصل أي قفزة في موضع المؤشر. عشان كده
+       الفحص هنا بيغطي *أي* تداخل بين المؤشر والتوكن.
 
-        // لو فيه تحديد نص (مش مجرد مؤشر)، سيب المتصفح يتعامل عادي
-        if (start !== end) return;
-
-        // نبني نسخة من الـ regex بدون علم /g عشان نقدر نستخدمها في exec
-        // بأمان من غير مشاكل lastIndex بين استدعاءات مختلفة
+       ملحوظة مهمة (2): معالجة keydown بس مش كافية. كيبوردات
+       الموبايل (خصوصًا لوحات المفاتيح الافتراضية على أندرويد عبر
+       IME) غالبًا بتبعت حدث input مباشرة (deleteContentBackward/
+       deleteContentForward) من غير ما تطلق keydown "حقيقي" Claude
+       يقدر يمسكه بنفس الطريقة، أو تطلقه بعد ما التغيير يكون حصل
+       فعليًا. عشان كده بنستخدم *beforeinput* كخط دفاع أساسي (بيتفعل
+       قبل ما أي تغيير يحصل فعليًا في القيمة، فبنقدر نمنعه ونطبّق
+       حذفنا احنا بدل منه)، ونسيب معالجة keydown كخط دفاع احتياطي
+       لأي متصفح/جهاز مش بيدعم beforeinput بشكل كامل. */
+    function findEmojiTokenTouchingCaret(val, start, isForwardDelete) {
         var re = new RegExp(TOKEN_RE.source, 'g');
         var m;
-        var target = null;
-
         while ((m = re.exec(val)) !== null) {
-            if (e.key === 'Backspace' && m.index < start && (m.index + m[0].length) >= start) {
-                target = m;
-                break;
-            }
-            if (e.key === 'Delete' && m.index <= start && (m.index + m[0].length) > start) {
-                target = m;
-                break;
-            }
+            var tokenStart = m.index;
+            var tokenEnd = m.index + m[0].length;
+            if (start > tokenStart && start < tokenEnd) return m;
+            if (!isForwardDelete && start === tokenEnd) return m;
+            if (isForwardDelete && start === tokenStart) return m;
         }
+        return null;
+    }
 
-        if (!target) return; // مفيش توكن ملامس للمؤشر، سيب السلوك الافتراضي
-
-        e.preventDefault();
-        var newVal = val.slice(0, target.index) + val.slice(target.index + target[0].length);
+    function deleteTokenMatch(textarea, m) {
+        var val = textarea.value;
+        var newVal = val.slice(0, m.index) + val.slice(m.index + m[0].length);
         textarea.value = newVal;
-        var newPos = target.index;
+        var newPos = m.index;
         textarea.setSelectionRange(newPos, newPos);
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
         requestAnimationFrame(syncFakeCaret);
-
         if (navigator.vibrate) {
             try { navigator.vibrate(4); } catch (e2) {}
         }
+    }
+
+    function handleBeforeInputDeletion(e, textarea) {
+        var type = e.inputType || '';
+        var isForwardDelete;
+        if (type === 'deleteContentBackward') isForwardDelete = false;
+        else if (type === 'deleteContentForward') isForwardDelete = true;
+        else return; // مش عملية حذف بسيطة (لصق، إدراج نص، إلخ)، سيبها عادي
+
+        var start = textarea.selectionStart;
+        var end = textarea.selectionEnd;
+        if (start !== end) return; // فيه تحديد نص، سيب المتصفح يتعامل عادي
+
+        var target = findEmojiTokenTouchingCaret(textarea.value, start, isForwardDelete);
+        if (!target) return;
+
+        e.preventDefault();
+        deleteTokenMatch(textarea, target);
+    }
+
+    function handleEmojiTokenDeletion(e, textarea) {
+        if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+
+        var start = textarea.selectionStart;
+        var end = textarea.selectionEnd;
+        if (start !== end) return; // فيه تحديد نص، سيب المتصفح يتعامل عادي
+
+        var target = findEmojiTokenTouchingCaret(textarea.value, start, e.key === 'Delete');
+        if (!target) return;
+
+        e.preventDefault();
+        deleteTokenMatch(textarea, target);
     }
 
     function syncOverlayGeometry() {
