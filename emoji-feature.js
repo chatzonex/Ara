@@ -34,6 +34,16 @@
     var TOKEN_PREFIX = '[[czemoji:';
     var TOKEN_SUFFIX = ']]';
     var TOKEN_RE = /\[\[czemoji:([a-zA-Z0-9_]+)\]\]/g;
+    // علامات عزل اتجاه يونيكود (Unicode Bidi Isolate) بتتحط حوالين
+    // كل توكن. المشكلة الأصلية: حروف التوكن الإنجليزية ("czemoji")
+    // لما تتحط جوه جملة عربي (RTL)، المتصفح بيتعامل معاها كأنها
+    // "كلمة إنجليزية" وسط الجملة العربي، فبيعيد ترتيبها بصريًا حسب
+    // خوارزمية Bidi — وده اللي بيخلي إيموجي يظهر قبل الكلمة أو
+    // يتلخبط الترتيب لو حطيت كذا إيموجي ورا بعض. بلفّ التوكن بعلامتي
+    // العزل دول، بنقول للمتصفح "الجزء ده اتجاهه منعزل عن الجملة اللي
+    // حواليه" فمبيأثرش في ترتيب أي حاجة تانية ولا بيتأثر بيها.
+    var ISOLATE_START = '\u2066'; // LRI - Left-to-Right Isolate
+    var ISOLATE_END = '\u2069';   // PDI - Pop Directional Isolate
 
     var manifestData = null; // { size, cols, rows, items: [{id,x,y}] }
     var manifestById = {};   // id -> {x,y}
@@ -222,13 +232,15 @@
         if (!overlayEl || !overlayTextarea) return;
         var raw = overlayTextarea.value || '';
         if (!manifestData) {
-            // لسه الـ manifest ملحملش: نعرض التوكن كنص عادي مؤقتًا
-            overlayEl.textContent = raw;
+            // لسه الـ manifest ملحملش: منعرضش التوكن الخام أبدًا، نشيله
+            // مؤقتًا لحد ما يجهز (هيترندر صورة فورًا أول ما يجهز، تحت)
+            TOKEN_RE.lastIndex = 0;
+            overlayEl.textContent = raw.replace(TOKEN_RE, '');
             return;
         }
-        overlayEl.innerHTML = renderTextWithEmoji(raw, Math.round(
-            parseFloat(window.getComputedStyle(overlayTextarea).fontSize) || 20
-        ));
+        // مقاس الإيموجي في خانة الكتابة أكبر شوية من حجم الخط عشان يبان واضح
+        var baseSize = parseFloat(window.getComputedStyle(overlayTextarea).fontSize) || 20;
+        overlayEl.innerHTML = renderTextWithEmoji(raw, Math.round(baseSize * 1.25));
         syncOverlayScroll();
         syncOverlayGeometry();
     }
@@ -373,7 +385,7 @@
     function insertEmojiToken(emojiId) {
         var textarea = $('convTextarea');
         if (!textarea) return;
-        var token = TOKEN_PREFIX + emojiId + TOKEN_SUFFIX;
+        var token = ISOLATE_START + TOKEN_PREFIX + emojiId + TOKEN_SUFFIX + ISOLATE_END;
         var start = textarea.selectionStart != null ? textarea.selectionStart : textarea.value.length;
         var end = textarea.selectionEnd != null ? textarea.selectionEnd : textarea.value.length;
         var val = textarea.value;
@@ -393,24 +405,38 @@
        بيراقب convMessages وأي فقاعة جديدة تتضاف، يدور على
        .bubble-text جواها ولو لاقى توكن إيموجي يستبدله بصورة
        ================================================= */
+    var BUBBLE_EMOJI_SIZE = 26; // كان 22 — كبرناه شوية عشان يبان أوضح
+
     function processMessageBubble(bubbleEl) {
-        if (!manifestData) return; // لسه الـ manifest ملحملش
         if (bubbleEl.dataset.czEmojiProcessed === '1') return;
 
         var textEl = bubbleEl.querySelector('.bubble-text');
         if (!textEl) return;
 
-        var raw = textEl.textContent || '';
-        if (raw.indexOf(TOKEN_PREFIX) === -1) {
-            bubbleEl.dataset.czEmojiProcessed = '1';
-            return;
+        // بنحتفظ بالنص الأصلي أول مرة نشوف فيها الفقاعة دي، عشان لو
+        // المانيفست لسه مجهزش، نقدر نرجعله تاني بعد كده من غير ما
+        // نفقد التوكن (بعد ما نكون شلناه من العرض مؤقتًا تحت)
+        var raw = bubbleEl.dataset.czRawText;
+        if (raw === undefined) {
+            raw = textEl.textContent || '';
+            if (raw.indexOf(TOKEN_PREFIX) === -1) {
+                bubbleEl.dataset.czEmojiProcessed = '1';
+                return; // مفيش توكن أصلًا، متلمسهاش
+            }
+            bubbleEl.dataset.czRawText = raw;
         }
 
-        var html = renderTextWithEmoji(raw, 22);
-        if (html !== null) {
-            textEl.innerHTML = html;
-            bubbleEl.classList.add('cz-has-emoji');
+        if (!manifestData) {
+            // منعرضش التوكن الخام خالص حتى مؤقتًا: نشيله من العرض
+            // لحد ما المانيفست يجهز، وقتها processAllVisibleMessages
+            // هيرجع يرندرها صورة كاملة (شوف watchMessagesContainer)
+            TOKEN_RE.lastIndex = 0;
+            textEl.textContent = raw.replace(TOKEN_RE, '');
+            return; // من غير ما نعلّم إنها اتعملها processed
         }
+
+        textEl.innerHTML = renderTextWithEmoji(raw, BUBBLE_EMOJI_SIZE);
+        bubbleEl.classList.add('cz-has-emoji');
         bubbleEl.dataset.czEmojiProcessed = '1';
     }
 
@@ -430,7 +456,9 @@
         });
 
         var observer = new MutationObserver(function (mutations) {
-            if (!manifestData) return; // هيتحط باقي بعد ما يخلص تحميل
+            // ملحوظة: مبنستناش المانيفست هنا عمدًا — processMessageBubble
+            // بقى بيخفي التوكن الخام بنفسه فورًا لو المانيفست لسه مجهزش،
+            // وبيترندر صورة كاملة لما يجهز (بدل ما نسيب التوكن الخام باين)
             var needsProcess = false;
             mutations.forEach(function (m) {
                 if (m.addedNodes && m.addedNodes.length) needsProcess = true;

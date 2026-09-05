@@ -72,7 +72,15 @@
 }
 
 .cz-textarea-overlay .cz-emoji-img {
-    vertical-align: -5px;
+    vertical-align: -6px;
+}
+
+/* عزل اتجاه لكل صورة إيموجي بمفردها، عشان وجودها جوه جملة عربي
+   (RTL) ماياثرش على ترتيب عرض أي حاجة حواليها، ولا يتأثر هو
+   نفسه بيها — بيحل مشكلة "الإيموجي بيظهر قبل الكلمة" لما تحط
+   كذا إيموجي ورا بعض */
+.cz-emoji-img {
+    unicode-bidi: isolate;
 }
 
 /* ===== الطبقة الخلفية للبيكر ===== */
@@ -176,7 +184,7 @@
 
 /* ===== الإيموجي داخل فقاعة الرسالة ===== */
 .bubble-text .cz-emoji-img {
-    vertical-align: -5px;
+    vertical-align: -6px;
 }
 
 .bubble.cz-has-emoji .bubble-text {
