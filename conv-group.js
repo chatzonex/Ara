@@ -1279,18 +1279,13 @@ import {
       return;
     }
     const _0x529064 = _0x22a082.querySelector(".bubble") || _0x22a082;
-    const _0x1b12eb = _0x529064.getBoundingClientRect();
-    const _0x720e95 = document.documentElement.dir === "rtl";
     _0x46b908.style.visibility = "hidden";
-    _0x46b908.style.top = "0px";
-    _0x46b908.style.left = "0px";
-    _0x46b908.style.right = "auto";
     _0x46b908.classList.add("open");
+    const _0x1b12eb = _0x529064.getBoundingClientRect();
     const _0xa5017d = _0x46b908.getBoundingClientRect();
+    const _0x720e95 = document.documentElement.dir === "rtl";
     const _0x56022c = _0xa5017d.width || 230;
     const _0x562d54 = _0xa5017d.height || 180;
-    _0x46b908.classList.remove("open");
-    _0x46b908.style.visibility = "";
     const _0x198c23 = 10;
     let _0x3a4bd3 = _0x1b12eb.bottom + 6;
     if (_0x3a4bd3 + _0x562d54 > window.innerHeight - _0x198c23) {
@@ -1313,7 +1308,7 @@ import {
       _0x46b908.style.left = _0x1331c9 + "px";
       _0x46b908.style.right = "auto";
     }
-    _0x46b908.classList.add("open");
+    _0x46b908.style.visibility = "";
     _0x1cdb34.classList.add("open");
   }
   function _0x109e6d() {
@@ -1489,9 +1484,17 @@ import {
   const _0xce0fee = document.getElementById("convTextarea");
   const _0x288463 = document.getElementById("convInputBar");
   const _0x46b1e2 = document.getElementById("convSendBtn");
+  let _0x7b3e91 = false;
   function _0x476654() {
-    _0xce0fee.style.height = "auto";
-    _0xce0fee.style.height = Math.min(_0xce0fee.scrollHeight, 120) + "px";
+    if (_0x7b3e91) {
+      return;
+    }
+    _0x7b3e91 = true;
+    requestAnimationFrame(() => {
+      _0x7b3e91 = false;
+      _0xce0fee.style.height = "auto";
+      _0xce0fee.style.height = Math.min(_0xce0fee.scrollHeight, 120) + "px";
+    });
   }
   function _0x3ef4b9() {
     const _0x38ddc2 = _0xce0fee.value.trim().length > 0;
@@ -1645,6 +1648,7 @@ import {
       }
     });
   }
+  let _0x6f1a02 = false;
   function _0x36ffe1(_0x130dad) {
     const _0x16dae9 =
       window.CZPrivacy && window.CZPrivacy.areReadReceiptsHidden
@@ -1653,15 +1657,36 @@ import {
     if (_0x16dae9) {
       return;
     }
+    if (_0x6f1a02) {
+      return;
+    }
+    const _0x7d3c19 = [];
     _0x130dad.forEach((_0x2de1c6) => {
       const _0x4c6b7e = _0x2de1c6.data();
       const _0x2c971c =
         (_0x4c6b7e.senderEmail || "").toLowerCase() !== _0x3712b6;
       const _0x41c077 = _0x4c6b7e.status === "unread";
       if (_0x2c971c && _0x41c077) {
-        _0x2bfdd0(_0x2de1c6.ref);
+        _0x7d3c19.push(_0x2de1c6.ref);
       }
     });
+    if (_0x7d3c19.length) {
+      _0x6f1a02 = true;
+      const _0x9b2e40 = writeBatch(db);
+      _0x7d3c19.forEach((_0x3f4a91) => {
+        _0x9b2e40.update(_0x3f4a91, {
+          status: "read",
+        });
+      });
+      _0x9b2e40
+        .commit()
+        .catch((_0x8c3d71) => {
+          console.error("فشل تحديث حالة الرسايل إلى مقروءة:", _0x8c3d71);
+        })
+        .finally(() => {
+          _0x6f1a02 = false;
+        });
+    }
   }
   async function _0x5873d2() {
     const _0x5a032b = await ensureAuthenticated();

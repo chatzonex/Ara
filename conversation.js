@@ -1810,18 +1810,13 @@ async function saveContact(_0x661dcc, _0x282a4d) {
       return;
     }
     const _0x380532 = _0x5c59fb.querySelector(".bubble") || _0x5c59fb;
-    const _0x5e0f87 = _0x380532.getBoundingClientRect();
-    const _0x5c0e21 = document.documentElement.dir === "rtl";
     _0x42cf83.style.visibility = "hidden";
-    _0x42cf83.style.top = "0px";
-    _0x42cf83.style.left = "0px";
-    _0x42cf83.style.right = "auto";
     _0x42cf83.classList.add("open");
+    const _0x5e0f87 = _0x380532.getBoundingClientRect();
     const _0x4925bd = _0x42cf83.getBoundingClientRect();
+    const _0x5c0e21 = document.documentElement.dir === "rtl";
     const _0xa81ac1 = _0x4925bd.width || 230;
     const _0x31ae70 = _0x4925bd.height || 210;
-    _0x42cf83.classList.remove("open");
-    _0x42cf83.style.visibility = "";
     const _0x193999 = 10;
     let _0x5eeb9a = _0x5e0f87.bottom + 6;
     if (_0x5eeb9a + _0x31ae70 > window.innerHeight - _0x193999) {
@@ -1844,7 +1839,7 @@ async function saveContact(_0x661dcc, _0x282a4d) {
       _0x42cf83.style.left = _0xe630e9 + "px";
       _0x42cf83.style.right = "auto";
     }
-    _0x42cf83.classList.add("open");
+    _0x42cf83.style.visibility = "";
     _0x5a4d50.classList.add("open");
   }
   function _0x54897d() {
@@ -2239,9 +2234,17 @@ async function saveContact(_0x661dcc, _0x282a4d) {
   const _0x1f8f26 = document.getElementById("convTextarea");
   const _0x22b699 = document.getElementById("convInputBar");
   const _0x5ebf0a = document.getElementById("convSendBtn");
+  let _0x7b3e91 = false;
   function _0x2fea2b() {
-    _0x1f8f26.style.height = "auto";
-    _0x1f8f26.style.height = Math.min(_0x1f8f26.scrollHeight, 120) + "px";
+    if (_0x7b3e91) {
+      return;
+    }
+    _0x7b3e91 = true;
+    requestAnimationFrame(() => {
+      _0x7b3e91 = false;
+      _0x1f8f26.style.height = "auto";
+      _0x1f8f26.style.height = Math.min(_0x1f8f26.scrollHeight, 120) + "px";
+    });
   }
   function _0x6b1658() {
     const _0x34e30f = _0x1f8f26.value.trim().length > 0;
@@ -2493,6 +2496,7 @@ async function saveContact(_0x661dcc, _0x282a4d) {
     );
   }
   const _0x314967 = _0x4c9e47.toLowerCase();
+  let _0x6f1a02 = false;
   function _0x8a6c36(_0x2563fc) {
     const _0x1fc652 =
       window.CZPrivacy && window.CZPrivacy.areReadReceiptsHidden
@@ -2501,15 +2505,36 @@ async function saveContact(_0x661dcc, _0x282a4d) {
     if (_0x1fc652 || _0x59282a) {
       return;
     }
+    if (_0x6f1a02) {
+      return;
+    }
+    const _0x7d3c19 = [];
     _0x2563fc.forEach((_0x75ff4) => {
       const _0x540283 = _0x75ff4.data();
       const _0x36c966 =
         (_0x540283.senderEmail || "").toLowerCase() !== _0x314967;
       const _0x373534 = _0x540283.status === "unread";
       if (_0x36c966 && _0x373534) {
-        _0x4743fa(_0x75ff4.ref);
+        _0x7d3c19.push(_0x75ff4.ref);
       }
     });
+    if (_0x7d3c19.length) {
+      _0x6f1a02 = true;
+      const _0x9b2e40 = writeBatch(db);
+      _0x7d3c19.forEach((_0x3f4a91) => {
+        _0x9b2e40.update(_0x3f4a91, {
+          status: "read",
+        });
+      });
+      _0x9b2e40
+        .commit()
+        .catch((_0x8c3d71) => {
+          console.error("فشل تحديث حالة الرسايل إلى مقروءة:", _0x8c3d71);
+        })
+        .finally(() => {
+          _0x6f1a02 = false;
+        });
+    }
   }
   function _0xfecab6() {
     const _0x2dfefc = _0x1f8f26.value.trim();
