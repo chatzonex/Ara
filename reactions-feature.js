@@ -356,12 +356,24 @@ import {
         var reactions = (data && data.reactions) || {};
         var entries = Object.keys(reactions).filter(function (k) { return reactions[k]; });
 
+        // بصمة سريعة لمحتوى الرياكتس الحالي. لو نفس اللي كان موجود قبل
+        // كده مبنعملش أي تعديل في الـ DOM خالص — ده أهم سطر في الملف:
+        // من غيره، أي تعديل في DOM جوه #convMessages (حتى لو تافه) بيولّد
+        // mutation جديدة، والـ MutationObserver اللي بيراقب الحاوية ده
+        // بيعيد نداء renderAllBadges() تاني، اللي بيعدل الـ DOM تاني،
+        // وهكذا في حلقة لا نهائية بتوقف الصفحة كلها (Not Responding).
+        var fp = manifestData
+            ? entries.map(function (k) { return k + ':' + reactions[k]; }).sort().join('|')
+            : (bubble.dataset.czReactFp || '__pending__');
+        if (bubble.dataset.czReactFp === fp) return;
+
         var badge = bubble.querySelector('.cz-reaction-badge');
         if (!entries.length) {
             if (badge) badge.remove();
+            bubble.dataset.czReactFp = fp;
             return;
         }
-        if (!manifestData) return; // هيترندر تاني لما المانيفست يجهز
+        if (!manifestData) return; // هيترندر تاني لما المانيفست يجهز (fp هتفضل __pending__)
 
         // تجميع حسب نوع الإيموجي عشان لو الاتنين اختاروا نفس الرياكت
         var counts = {};
@@ -390,6 +402,7 @@ import {
             }
             badge.appendChild(chip);
         });
+        bubble.dataset.czReactFp = fp;
     }
 
     function renderAllBadges() {
