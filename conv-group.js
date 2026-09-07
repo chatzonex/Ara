@@ -922,6 +922,93 @@ import {
       : "No messages yet, say hi 👋";
     _0x5c2528.appendChild(_0x5c7ad7);
   }
+  function _0x8d3f61(_0x51dcdd, _0x1eaf01) {
+    const _0x3f2e11 = _0x1eaf01 ? _0x1eaf01.split("|") : [];
+    const _0x1a2b3c = _0x3f2e11.length === _0x51dcdd.length;
+    const _0x9c7ee = _0x5c2528.querySelector(".conv-empty");
+    if (_0x9c7ee) {
+      _0x5c2528.innerHTML = "";
+    }
+    _0x51dcdd.forEach((_0x420b6d, _0x7e2a01) => {
+      const _0x430329 = _0x420b6d.data();
+      if (_0x430329.replyTo && _0x430329.replyTo.id) {
+        const _0x35f605 = _0x4fe457.get(_0x430329.replyTo.id);
+        if (_0x35f605) {
+          const _0x3a5aa8 =
+            (_0x35f605.senderEmail || "").toLowerCase() === _0x3712b6;
+          const _0x1f5e2a = !_0x3a5aa8
+            ? _0x5bf423.get(_0x35f605.senderUid)
+            : null;
+          _0x430329.replyTo.senderName = _0x3a5aa8
+            ? _0x338d14.reply_you
+            : _0x1f5e2a
+              ? _0x1f5e2a.name
+              : _0x267a6a(_0x35f605.senderEmail);
+          _0x430329.replyTo.deleted = !!_0x35f605.deleted;
+        }
+      }
+      const _0x6b8e21 = _0x1a2b3c ? _0x3f2e11[_0x7e2a01] : null;
+      const _0x7a9c02 = _0x6b8e21 ? _0x6b8e21.split(":")[0] : null;
+      const _0x5c1e90 =
+        !_0x9c7ee && _0x1a2b3c && _0x7a9c02 === _0x420b6d.id
+          ? _0x6b8e21
+          : null;
+      const _0x2ff890 =
+        _0x420b6d.id +
+        ":" +
+        (_0x430329.status || "") +
+        ":" +
+        (_0x430329.text ? _0x430329.text.length : 0) +
+        ":" +
+        (_0x430329.deleted ? 1 : 0) +
+        ":" +
+        (_0x430329.edited ? 1 : 0);
+      const _0x4d9e33 = _0x5c2528.querySelector(
+        '[data-msg-id="' + _0x420b6d.id + '"]',
+      );
+      if (_0x4d9e33 && _0x5c1e90 === _0x2ff890) {
+        return;
+      }
+      const _0x9a3f22 = document.createDocumentFragment();
+      const _0x3e7a44 = document.createComment("");
+      _0x9a3f22.appendChild(_0x3e7a44);
+      _0x5c2528.appendChild(_0x9a3f22);
+      if (_0x430329.type === "system") {
+        _0x533763(_0x420b6d.id, _0x430329);
+      } else {
+        _0x473826(_0x420b6d.id, _0x430329, _0x3712b6);
+      }
+      const _0x1c9d5f = _0x3e7a44.previousSibling;
+      _0x3e7a44.remove();
+      if (_0x4d9e33 && _0x1c9d5f) {
+        _0x4d9e33.replaceWith(_0x1c9d5f);
+      } else if (_0x4d9e33) {
+        _0x4d9e33.remove();
+      }
+    });
+    const _0x6d1f22 = new Set(_0x51dcdd.map((_0x757995) => _0x757995.id));
+    Array.from(_0x5c2528.querySelectorAll("[data-msg-id]")).forEach(
+      (_0x2a1b9e) => {
+        if (!_0x6d1f22.has(_0x2a1b9e.dataset.msgId)) {
+          _0x2a1b9e.remove();
+        }
+      },
+    );
+    const _0x9e5d31 = _0x5c2528.children;
+    for (let _0x4a1e02 = 0; _0x4a1e02 < _0x51dcdd.length; _0x4a1e02++) {
+      const _0x1f9a03 = _0x51dcdd[_0x4a1e02].id;
+      const _0x7c2e04 = _0x9e5d31[_0x4a1e02];
+      if (!_0x7c2e04 || _0x7c2e04.dataset.msgId !== _0x1f9a03) {
+        const _0x5e9c11 = _0x5c2528.querySelector(
+          '[data-msg-id="' + _0x1f9a03 + '"]',
+        );
+        if (_0x5e9c11 && _0x5e9c11 !== _0x7c2e04) {
+          _0x5c2528.insertBefore(_0x5e9c11, _0x7c2e04 || null);
+        }
+      }
+    }
+    _0x315e96(false);
+  }
   let _0x558ea1 = false;
   const _0x552d68 = new Map();
   const _0x1732c1 = document.getElementById("convTopbarSelect");
@@ -1655,34 +1742,32 @@ import {
         );
         if (!_0x51dcdd.length) {
           _0x3e5458();
+          window.__czGroupLastMsgFp = null;
           return;
         }
-        _0x5c2528.innerHTML = "";
-        _0x51dcdd.forEach((_0x420b6d) => {
-          const _0x430329 = _0x420b6d.data();
-          if (_0x430329.type === "system") {
-            _0x533763(_0x420b6d.id, _0x430329);
-            return;
-          }
-          if (_0x430329.replyTo && _0x430329.replyTo.id) {
-            const _0x35f605 = _0x4fe457.get(_0x430329.replyTo.id);
-            if (_0x35f605) {
-              const _0x3a5aa8 =
-                (_0x35f605.senderEmail || "").toLowerCase() === _0x3712b6;
-              const _0x1f5e2a = !_0x3a5aa8
-                ? _0x5bf423.get(_0x35f605.senderUid)
-                : null;
-              _0x430329.replyTo.senderName = _0x3a5aa8
-                ? _0x338d14.reply_you
-                : _0x1f5e2a
-                  ? _0x1f5e2a.name
-                  : _0x267a6a(_0x35f605.senderEmail);
-              _0x430329.replyTo.deleted = !!_0x35f605.deleted;
-            }
-          }
-          _0x473826(_0x420b6d.id, _0x430329, _0x3712b6);
-        });
-        _0x315e96(false);
+        const __czGFp = _0x51dcdd
+          .map(function (_d) {
+            var __dd = _d.data();
+            return (
+              _d.id +
+              ":" +
+              (__dd.status || "") +
+              ":" +
+              (__dd.text ? __dd.text.length : 0) +
+              ":" +
+              (__dd.deleted ? 1 : 0) +
+              ":" +
+              (__dd.edited ? 1 : 0)
+            );
+          })
+          .join("|");
+        if (window.__czGroupLastMsgFp === __czGFp) {
+          _0x36ffe1(_0x51dcdd);
+          return;
+        }
+        const _0x1eaf01 = window.__czGroupLastMsgFp;
+        window.__czGroupLastMsgFp = __czGFp;
+        _0x8d3f61(_0x51dcdd, _0x1eaf01);
         if (_0x558ea1) {
           const _0x2156d1 = new Set(_0x51dcdd.map((_0x3bf204) => _0x3bf204.id));
           [..._0x552d68.keys()].forEach((_0x3f15d8) => {
