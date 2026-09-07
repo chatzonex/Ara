@@ -263,93 +263,55 @@ import {
         return bar;
     }
 
-    /* بنحط الصف عايم فوق قايمة Reply/Copy/... نفسها (مش فوق
-       الفقاعة مباشرة) — عشان الاتنين يتحركوا كوحدة واحدة بالظبط
-       زي واتساب: لو الرسالة قريبة من تحت الشاشة والقايمة اضطرت
-       تتقلب فوق الفقاعة، الصف بيتحط فوق القايمة (اللي بقت فوق)،
-       مش فوق الفقاعة تاني، فمايحصلش تصادم/تلاصق بينهم. */
-    function positionReactBar(bubbleRect) {
+    /* بنحسب مكان القايمة (Reply/Copy/...) وصف الرياكشن مع بعض
+       كخطوة واحدة، مش خطوتين منفصلتين — عشان الاتنين يطلعوا متلاصقين
+       صح فوق بعض من غير ما حد "يقفز" لمكان تاني بعد ما التاني
+       اتحط. المنطق:
+       1) نسيب القايمة في المكان اللي conversation.js حطها فيه أصلاً
+          (سواء تحت الفقاعة أو مقلوبة فوقها).
+       2) لو مفيش مكان كفاية فوق القايمة عشان صف الرياكشن يتحط
+          فوقها (يعني القايمة قريبة من حافة الشاشة العلوية)، بنرفع
+          الكومة كلها (القايمة + الصف) سوا لمنطقة مريحة من الشاشة
+          (قريب من النص) عشان الاتنين يفضلوا ظاهرين كاملين وملزقين
+          ببعض، بدل ما يتقطعوا أو يتلزقوا في الحافة. */
+    function positionReactBarAndMenu(bubbleRect) {
         if (!reactBar) return;
         var menu = $('msgCtxMenu');
+        if (!menu || !menu.classList.contains('open')) return;
+
         reactBar.style.visibility = 'hidden';
         reactBar.classList.add('open');
-        var barRect = reactBar.getBoundingClientRect();
+
         var margin = 10;
         var gap = 10;
-        var top;
+        var menuRect = menu.getBoundingClientRect();
+        var barRect = reactBar.getBoundingClientRect();
+        var stackHeight = barRect.height + gap + menuRect.height;
 
-        if (menu && menu.classList.contains('open')) {
-            var menuRect = menu.getBoundingClientRect();
-            var spaceAboveMenu = menuRect.top - gap;
-            var spaceBelowMenu = window.innerHeight - menuRect.bottom - gap;
+        var spaceAboveMenu = menuRect.top - margin;
+        var menuTop = menuRect.top;
 
-            if (spaceAboveMenu >= barRect.height + margin) {
-                // فيه مكان كفاية فوق القايمة — الوضع العادي
-                // (القايمة تحت الفقاعة، والصف فوق القايمة)
-                top = menuRect.top - barRect.height - gap;
-            } else if (spaceBelowMenu >= barRect.height + margin) {
-                // القايمة اتقلبت فوق الفقاعة (مفيش مكان تحتها) —
-                // نحط الصف تحت القايمة بدل فوقها
-                top = menuRect.bottom + gap;
-            } else {
-                // مفيش مكان كفاية في الاتجاهين (شاشة صغيرة جدًا) —
-                // نلزقه بأقرب حافة ممكنة
-                top = spaceAboveMenu > spaceBelowMenu
-                    ? margin
-                    : window.innerHeight - barRect.height - margin;
-            }
-        } else {
-            // fallback لو القايمة مش مفتوحة لأي سبب: نفس المنطق القديم
-            // بالنسبة للفقاعة نفسها
-            top = bubbleRect.top - barRect.height - gap;
-            if (top < margin) top = bubbleRect.bottom + gap;
+        if (spaceAboveMenu < barRect.height + gap) {
+            // مفيش مكان كفاية فوق القايمة عشان الصف يتحط فوقها —
+            // نرفع الكومة كلها (صف + قايمة) لمكان مريح في الشاشة
+            var idealTop = Math.max(margin, (window.innerHeight - stackHeight) / 2);
+            menuTop = Math.min(
+                idealTop,
+                window.innerHeight - stackHeight - margin
+            );
+            menuTop = Math.max(margin + barRect.height + gap, menuTop);
+            menu.style.top = menuTop + 'px';
         }
 
-        top = Math.min(Math.max(margin, top), window.innerHeight - barRect.height - margin);
+        var barTop = menuTop - barRect.height - gap;
         var center = bubbleRect.left + bubbleRect.width / 2;
         var left = Math.min(
             Math.max(margin, center - barRect.width / 2),
             window.innerWidth - barRect.width - margin
         );
-        reactBar.style.top = top + 'px';
+        reactBar.style.top = barTop + 'px';
         reactBar.style.left = left + 'px';
         reactBar.style.visibility = '';
-    }
-
-    /* لو الرسالة قريبة من تحت الشاشة، الكود الأصلي بتاع conversation.js
-       بيحاول يقلب القايمة لفوق الفقاعة، لكن بعدها بيحصرها (clamp) جوه
-       حدود الشاشة — ولو القايمة+صف الرياكشن مع بعض أطول من المسافة
-       المتاحة فوق الفقاعة، بيتلزقوا في آخر حافة تحت بدل ما يفضلوا
-       عايمين في وضع طبيعي. الدالة دي بترفع الاتنين (القايمة + الصف)
-       كوحدة واحدة لمنطقة مريحة من الشاشة (تقريبًا نصها) بس في الحالة
-       دي بالذات — لما الفقاعة قريبة أوي من تحت الشاشة. */
-    function relocateStackIfNearBottom(bubbleRect) {
-        var menu = $('msgCtxMenu');
-        if (!menu || !menu.classList.contains('open')) return;
-
-        var margin = 14;
-        var nearBottomThreshold = 140; // لو باقي أقل من كده تحت الفقاعة، نعتبرها "قريبة من تحت"
-        var spaceBelowBubble = window.innerHeight - bubbleRect.bottom;
-        if (spaceBelowBubble >= nearBottomThreshold) return; // مفيش داعي، فيه مكان كفاية أصلاً
-
-        var menuRect = menu.getBoundingClientRect();
-        var barRect = reactBar ? reactBar.getBoundingClientRect() : { height: 0 };
-        var gapBarMenu = 10;
-        var stackHeight = menuRect.height + (reactBar ? barRect.height + gapBarMenu : 0);
-
-        // نحط الكومة (الصف + القايمة) في نص الشاشة تقريبًا، طالما في
-        // مساحة كفاية، بدل ما تتلزق في الحافة
-        var idealTop = (window.innerHeight - stackHeight) / 2;
-        var menuTop = Math.min(
-            Math.max(margin, idealTop),
-            window.innerHeight - stackHeight - margin
-        );
-
-        menu.style.top = menuTop + 'px';
-
-        if (reactBar) {
-            reactBar.style.top = (menuTop - barRect.height - gapBarMenu) + 'px';
-        }
     }
 
     function showReactBarFor(rowEl) {
@@ -357,8 +319,7 @@ import {
         if (!rowEl) return;
         var bubble = rowEl.querySelector('.bubble');
         if (!bubble) return;
-        positionReactBar(bubble.getBoundingClientRect());
-        relocateStackIfNearBottom(bubble.getBoundingClientRect());
+        positionReactBarAndMenu(bubble.getBoundingClientRect());
         syncReactBarActiveState();
     }
 
