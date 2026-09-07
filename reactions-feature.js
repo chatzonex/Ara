@@ -132,10 +132,50 @@ import {
         });
         bar.appendChild(more);
 
-        menu.insertBefore(bar, menu.firstChild);
+        document.body.appendChild(bar);
         reactBar = bar;
         loadManifest().then(renderReactBarCells);
         return bar;
+    }
+
+    /* بنحط الصف عايم فوق فقاعة الرسالة بالظبط (مش جوه قايمة
+       Reply/Copy/...)، بنفس منطق تحديد المكان اللي القايمة نفسها
+       بتستخدمه (getBoundingClientRect + clamp جوه حدود الشاشة) */
+    function positionReactBar(bubbleRect) {
+        if (!reactBar) return;
+        reactBar.style.visibility = 'hidden';
+        reactBar.classList.add('open');
+        var barRect = reactBar.getBoundingClientRect();
+        var margin = 10;
+        var gap = 10;
+        var top = bubbleRect.top - barRect.height - gap;
+        if (top < margin) {
+            // مفيش مكان كفاية فوق (رسالة قريبة من أعلى الشاشة) —
+            // نحطه تحت الفقاعة بدل ما يتقطع
+            top = bubbleRect.bottom + gap;
+        }
+        top = Math.min(Math.max(margin, top), window.innerHeight - barRect.height - margin);
+        var center = bubbleRect.left + bubbleRect.width / 2;
+        var left = Math.min(
+            Math.max(margin, center - barRect.width / 2),
+            window.innerWidth - barRect.width - margin
+        );
+        reactBar.style.top = top + 'px';
+        reactBar.style.left = left + 'px';
+        reactBar.style.visibility = '';
+    }
+
+    function showReactBarFor(rowEl) {
+        if (!reactBar) buildReactBar();
+        if (!rowEl) return;
+        var bubble = rowEl.querySelector('.bubble');
+        if (!bubble) return;
+        positionReactBar(bubble.getBoundingClientRect());
+        syncReactBarActiveState();
+    }
+
+    function hideReactBar() {
+        if (reactBar) reactBar.classList.remove('open');
     }
 
     function renderReactBarCells() {
@@ -285,18 +325,27 @@ import {
         if (moreOverlay) moreOverlay.classList.remove('open');
     }
 
-    /* ============ مراقبة فتح قايمة الرسالة (Reply/Copy/...) ============ */
+    /* ============ مراقبة فتح/قفل قايمة الرسالة (Reply/Copy/...) ============
+       الصف العايم بتاع الرياكت مش جوه القايمة دي خالص — بس بيتفتح
+       ويتقفل معاها في نفس اللحظة (نفس الرسالة المحددة) */
     function watchCtxMenu() {
         var overlay = $('msgCtxOverlay');
         var menu = $('msgCtxMenu');
         if (!overlay || !menu) return;
         var mo = new MutationObserver(function () {
             if (menu.classList.contains('open')) {
-                if (!reactBar) buildReactBar();
-                syncReactBarActiveState();
+                showReactBarFor(document.querySelector('.msg-row.selected'));
+            } else {
+                hideReactBar();
             }
         });
         mo.observe(menu, { attributes: true, attributeFilter: ['class'] });
+        // لو المكان اتغيّر (تدوير الشاشة، سكرول...) وهو مفتوح، نظبطه تاني
+        window.addEventListener('resize', function () {
+            if (menu.classList.contains('open')) {
+                showReactBarFor(document.querySelector('.msg-row.selected'));
+            }
+        });
     }
 
     /* ============ عرض شارة الرياكت على كل فقاعة ============ */

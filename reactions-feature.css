@@ -5,15 +5,31 @@
    فوق التطبيق، بدون تعديل أي ملف أصلي.
 =================================================== */
 
-/* ===== صف الإيموجيهات الجاهزة (بيتحط تلقائي أول القايمة) ===== */
+/* ===== صف الإيموجيهات العايم فوق الفقاعة (مستقل تمامًا عن قايمة
+   Reply/Copy/... — عنصر منفصل بيتحط جنبها وبيتحرك/يتقفل معاها) ===== */
 .cz-react-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    padding: 8px 10px 10px;
-    border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-    margin-bottom: 4px;
+    gap: 2px;
+    padding: 6px 8px;
+    background: var(--bg, #14181D);
+    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cz-react-bar.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
 }
 
 .cz-react-bar-cell,
