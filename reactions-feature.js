@@ -316,12 +316,49 @@ import {
         reactBar.style.visibility = '';
     }
 
+    /* لو الرسالة قريبة من تحت الشاشة، الكود الأصلي بتاع conversation.js
+       بيحاول يقلب القايمة لفوق الفقاعة، لكن بعدها بيحصرها (clamp) جوه
+       حدود الشاشة — ولو القايمة+صف الرياكشن مع بعض أطول من المسافة
+       المتاحة فوق الفقاعة، بيتلزقوا في آخر حافة تحت بدل ما يفضلوا
+       عايمين في وضع طبيعي. الدالة دي بترفع الاتنين (القايمة + الصف)
+       كوحدة واحدة لمنطقة مريحة من الشاشة (تقريبًا نصها) بس في الحالة
+       دي بالذات — لما الفقاعة قريبة أوي من تحت الشاشة. */
+    function relocateStackIfNearBottom(bubbleRect) {
+        var menu = $('msgCtxMenu');
+        if (!menu || !menu.classList.contains('open')) return;
+
+        var margin = 14;
+        var nearBottomThreshold = 140; // لو باقي أقل من كده تحت الفقاعة، نعتبرها "قريبة من تحت"
+        var spaceBelowBubble = window.innerHeight - bubbleRect.bottom;
+        if (spaceBelowBubble >= nearBottomThreshold) return; // مفيش داعي، فيه مكان كفاية أصلاً
+
+        var menuRect = menu.getBoundingClientRect();
+        var barRect = reactBar ? reactBar.getBoundingClientRect() : { height: 0 };
+        var gapBarMenu = 10;
+        var stackHeight = menuRect.height + (reactBar ? barRect.height + gapBarMenu : 0);
+
+        // نحط الكومة (الصف + القايمة) في نص الشاشة تقريبًا، طالما في
+        // مساحة كفاية، بدل ما تتلزق في الحافة
+        var idealTop = (window.innerHeight - stackHeight) / 2;
+        var menuTop = Math.min(
+            Math.max(margin, idealTop),
+            window.innerHeight - stackHeight - margin
+        );
+
+        menu.style.top = menuTop + 'px';
+
+        if (reactBar) {
+            reactBar.style.top = (menuTop - barRect.height - gapBarMenu) + 'px';
+        }
+    }
+
     function showReactBarFor(rowEl) {
         if (!reactBar) buildReactBar();
         if (!rowEl) return;
         var bubble = rowEl.querySelector('.bubble');
         if (!bubble) return;
         positionReactBar(bubble.getBoundingClientRect());
+        relocateStackIfNearBottom(bubble.getBoundingClientRect());
         syncReactBarActiveState();
     }
 
