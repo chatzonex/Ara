@@ -1,0 +1,95 @@
+/* ===================================================
+   REACTIONS-FEATURE.CSS
+   ستايل صف الرياكت الجاهز جوه قايمة الرسالة + شارة
+   الرياكت اللي بتبان على حافة الفقاعة. إضافة جديدة
+   فوق التطبيق، بدون تعديل أي ملف أصلي.
+=================================================== */
+
+/* ===== صف الإيموجيهات الجاهزة (بيتحط تلقائي أول القايمة) ===== */
+.cz-react-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 8px 10px 10px;
+    border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+    margin-bottom: 4px;
+}
+
+.cz-react-bar-cell,
+.cz-react-bar-more {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.cz-react-bar-cell:active,
+.cz-react-bar-more:active {
+    transform: scale(0.85);
+    background: var(--glass-strong, rgba(255, 255, 255, 0.1));
+}
+
+.cz-react-bar-cell.cz-active {
+    background: var(--glass-strong, rgba(255, 255, 255, 0.12));
+    box-shadow: inset 0 0 0 1.5px var(--accent, #25D9A0);
+}
+
+.cz-react-bar-more {
+    color: var(--text-dim, #8A9691);
+}
+
+.cz-react-bar-more svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ===== شارة الرياكت على حافة الفقاعة ===== */
+.cz-reaction-badge {
+    position: absolute;
+    bottom: -10px;
+    display: flex;
+    gap: 2px;
+    background: var(--bg, #0B0F14);
+    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.14));
+    border-radius: 999px;
+    padding: 2px 5px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    z-index: 2;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.bubble.bubble-right .cz-reaction-badge {
+    left: -6px;
+}
+
+.bubble.bubble-left .cz-reaction-badge {
+    right: -6px;
+}
+
+.cz-reaction-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.cz-reaction-chip .cz-emoji-img {
+    display: inline-block;
+}
+
+.cz-reaction-count {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--text-dim, #8A9691);
+    margin-inline-start: 2px;
+    line-height: 1;
+}
