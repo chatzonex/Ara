@@ -1387,6 +1387,94 @@ async function saveContact(_0x661dcc, _0x282a4d) {
       _0x53c1bf(_0x5903a5, _0x5f3aef, _0x328248, _0x4b5e5d);
     }
   }
+  function _0x9f10ba(_0x360197, _0x1eaf01) {
+    const _0x3f2e11 = _0x1eaf01 ? _0x1eaf01.split("|") : [];
+    const _0x1a2b3c = _0x3f2e11.length === _0x360197.length;
+    const _0x9c7ee = _0x4f8ac5.querySelector(".conv-empty");
+    if (_0x9c7ee) {
+      _0x4f8ac5.innerHTML = "";
+    }
+    const _0x2d4f88 = _0x4f8ac5.querySelector(".typing-row");
+    if (_0x2d4f88) {
+      _0x2d4f88.remove();
+    }
+    _0x360197.forEach((_0x48921a, _0x7e2a01) => {
+      const _0x446134 = _0x48921a.data();
+      if (_0x446134.replyTo && _0x446134.replyTo.id) {
+        const _0x2bc445 = _0xcd2a21.get(_0x446134.replyTo.id);
+        if (_0x2bc445) {
+          const _0x5d0a79 =
+            (_0x2bc445.senderEmail || "").toLowerCase() ===
+            _0x4c9e47.toLowerCase();
+          _0x446134.replyTo.senderName = _0x5d0a79
+            ? _0x45d1f8.reply_you
+            : _0x74f363();
+          _0x446134.replyTo.deleted = !!_0x2bc445.deleted;
+        }
+      }
+      const _0x6b8e21 = _0x1a2b3c ? _0x3f2e11[_0x7e2a01] : null;
+      const _0x7a9c02 = _0x6b8e21 ? _0x6b8e21.split(":")[0] : null;
+      const _0x5c1e90 =
+        !_0x9c7ee && _0x1a2b3c && _0x7a9c02 === _0x48921a.id
+          ? _0x6b8e21
+          : null;
+      const _0x2ff890 =
+        _0x48921a.id +
+        ":" +
+        (_0x446134.status || "") +
+        ":" +
+        (_0x446134.text ? _0x446134.text.length : 0) +
+        ":" +
+        (_0x446134.deleted ? 1 : 0) +
+        ":" +
+        (_0x446134.edited ? 1 : 0);
+      const _0x4d9e33 = _0x4f8ac5.querySelector(
+        '[data-msg-id="' + _0x48921a.id + '"]',
+      );
+      if (_0x4d9e33 && _0x5c1e90 === _0x2ff890) {
+        return;
+      }
+      const _0x9a3f22 = document.createDocumentFragment();
+      const _0x3e7a44 = document.createComment("");
+      _0x9a3f22.appendChild(_0x3e7a44);
+      _0x4f8ac5.appendChild(_0x9a3f22);
+      if (_0x446134.type === "system") {
+        _0x30230b(_0x48921a.id, _0x446134);
+      } else {
+        _0x234742(_0x48921a.id, _0x446134, _0x4c9e47.toLowerCase());
+      }
+      const _0x1c9d5f = _0x3e7a44.previousSibling;
+      _0x3e7a44.remove();
+      if (_0x4d9e33 && _0x1c9d5f) {
+        _0x4d9e33.replaceWith(_0x1c9d5f);
+      } else if (_0x4d9e33) {
+        _0x4d9e33.remove();
+      }
+    });
+    const _0x6d1f22 = new Set(_0x360197.map((_0x757995) => _0x757995.id));
+    Array.from(_0x4f8ac5.querySelectorAll("[data-msg-id]")).forEach(
+      (_0x2a1b9e) => {
+        if (!_0x6d1f22.has(_0x2a1b9e.dataset.msgId)) {
+          _0x2a1b9e.remove();
+        }
+      },
+    );
+    const _0x9e5d31 = _0x4f8ac5.children;
+    for (let _0x4a1e02 = 0; _0x4a1e02 < _0x360197.length; _0x4a1e02++) {
+      const _0x1f9a03 = _0x360197[_0x4a1e02].id;
+      const _0x7c2e04 = _0x9e5d31[_0x4a1e02];
+      if (!_0x7c2e04 || _0x7c2e04.dataset.msgId !== _0x1f9a03) {
+        const _0x5e9c11 = _0x4f8ac5.querySelector(
+          '[data-msg-id="' + _0x1f9a03 + '"]',
+        );
+        if (_0x5e9c11 && _0x5e9c11 !== _0x7c2e04) {
+          _0x4f8ac5.insertBefore(_0x5e9c11, _0x7c2e04 || null);
+        }
+      }
+    }
+    _0xe4da7e();
+    _0x5eced8(false);
+  }
   let _0x1dc640 = false;
   function _0xe4da7e() {
     if (!_0x1dc640) {
@@ -2378,30 +2466,9 @@ async function saveContact(_0x661dcc, _0x282a4d) {
           _0x8a6c36(_0x360197);
           return;
         }
+        const _0x1eaf01 = window.__czLastMsgFp;
         window.__czLastMsgFp = __czFp;
-        _0x4f8ac5.innerHTML = "";
-        _0x360197.forEach((_0x48921a) => {
-          const _0x446134 = _0x48921a.data();
-          if (_0x446134.type === "system") {
-            _0x30230b(_0x48921a.id, _0x446134);
-            return;
-          }
-          if (_0x446134.replyTo && _0x446134.replyTo.id) {
-            const _0x2bc445 = _0xcd2a21.get(_0x446134.replyTo.id);
-            if (_0x2bc445) {
-              const _0x5d0a79 =
-                (_0x2bc445.senderEmail || "").toLowerCase() ===
-                _0x4c9e47.toLowerCase();
-              _0x446134.replyTo.senderName = _0x5d0a79
-                ? _0x45d1f8.reply_you
-                : _0x74f363();
-              _0x446134.replyTo.deleted = !!_0x2bc445.deleted;
-            }
-          }
-          _0x234742(_0x48921a.id, _0x446134, _0x4c9e47.toLowerCase());
-        });
-        _0xe4da7e();
-        _0x5eced8(false);
+        _0x9f10ba(_0x360197, _0x1eaf01);
         if (_0x22c646) {
           const _0x4acc31 = new Set(_0x360197.map((_0x757995) => _0x757995.id));
           [..._0x5c0c12.keys()].forEach((_0x39a600) => {
