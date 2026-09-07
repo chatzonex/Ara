@@ -1,32 +1,22 @@
 /* ===================================================
-   REACTIONS-FEATURE.JS  (نسخة عامة: conversation + conv-group + ai-chat)
+   REACTIONS-FEATURE.JS
    ملف مستقل تمامًا — بنفس مبدأ emoji-feature.js وenhancements.js:
-   مش بيلمس أو يعدّل في conversation.js / conv-group.js / ai-chat.js
-   أو ملفات الـ HTML بتاعتهم أي كود موجود، بس بيضيف عليه من برّه.
-
-   الملف بيكتشف لوحده هو شغال في أنهي صفحة (محادثة عادية / جروب /
-   شات الذكاء الاصطناعي) وبيختار "backend" التخزين المناسب:
-   - conversation.html  -> chats/{chatId}/messages/{msgId}   (Firestore)
-   - conv-group.html    -> groups/{groupId}/messages/{msgId} (Firestore)
-   - ai-chat.html        -> localStorage["cz_ai_chat_history"]  (محلي فقط،
-                            لأن المحادثة دي بينك وبين الذكاء الاصطناعي بس)
+   مش بيلمس أو يعدّل في conversation.js / conversation.html أي كود
+   موجود، بس بيضيف عليه من برّه (باستثناء سطرين HTML بسيطين لازم
+   تضيفهم إنت يدويًا — شوف تعليمات التركيب تحت).
 
    بيضيف:
    1) لما تعمل ضغطة مطولة على رسالة (بيفتح قايمة رد/نسخ/توجيه...
       الموجودة أصلاً)، بيتحط فوقها صف صغير فيه 6 إيموجيهات جاهزة
       + زرار "+" يفتح بيكر كامل لأي إيموجي من الـ 3593 المتاحين.
-   2) بالضغط على إيموجي: بيتسجل كـ"رياكت" بتاعك على الرسالة دي،
-      وبيتقفل القايمة تلقائي.
+   2) بالضغط على إيموجي: بيتسجل كـ"رياكت" بتاعك على الرسالة دي في
+      Firestore، وبيتقفل القايمة تلقائي.
    3) رياكت واحد بس لكل شخص على كل رسالة: لو ضغطت نفس الإيموجي
       اللي رياكتك عليه حاليًا بيتشال (toggle)، ولو ضغطت إيموجي
-      تاني بيستبدل القديم.
-   4) في المحادثة العادية والجروب: الرياكت بيبان فورًا لحظة اللحظة
-      عند كل الأطراف (Realtime عن طريق onSnapshot مستقل). في شات
-      الذكاء الاصطناعي: بيتسجل فورًا محليًا (مفيش طرف تاني يشوفه).
-   5) صف الرياكت وقايمة Reply/Copy/... بيتحركوا كوحدة واحدة: لو
-      الرسالة قريبة من تحت الشاشة والقايمة اضطرت تتقلب فوق الفقاعة،
-      الصف بيتحط فوق القايمة نفسها (مش فوق الفقاعة تاني) عشان
-      مايحصلش تلاصق/تصادم بينهم.
+      تاني بيستبدل القديم — مستحيل يبقى عندك رياكتين على نفس
+      الرسالة في نفس الوقت.
+   4) الرياكت بيبان فورًا لحظة اللحظة عند الطرفين (Realtime عن
+      طريق onSnapshot مستقل) كشارة صغيرة على حافة الفقاعة.
 
    بيستخدم نفس sprite / manifest بتوع emoji-feature.js (نفس الـ
    3593 إيموجي)، لكن بكود عرض مستقل تمامًا عشان الملفين يفضلوا
@@ -57,134 +47,16 @@ import {
 
     function $(id) { return document.getElementById(id); }
 
+    /* ============ تحديد المحادثة الحالية (نفس منطق conversation.js) ============ */
     var myEmail = localStorage.getItem('cz_verified_email') || '';
-    var myEmailLower = myEmail.toLowerCase();
-
-    /* ============ اختيار الـ backend المناسب حسب الصفحة ============
-       كل backend بيوفر:
-       - myKey: المفتاح بتاعي جوه object الـ reactions (إيميلي أو 'me')
-       - getReactions(msgId): {key: emojiId} أو null
-       - applyReaction(msgId, emojiId): يسجل/يشيل/يبدّل الرياكت
-       - subscribe(onChange): يبدأ المراقبة ويستدعي onChange() كل ما
-         البيانات تتغيّر (Realtime أو محلي)
-    ============================================================ */
-    var backend = null;
-
-    function buildFirestoreBackend(collectionPath) {
-        var messagesColRef = collection.apply(null, [db].concat(collectionPath));
-        var messagesById = new Map(); // msgId -> firestore doc data
-
-        return {
-            myKey: myEmailLower,
-            getReactions: function (msgId) {
-                var data = messagesById.get(msgId);
-                return (data && data.reactions) || null;
-            },
-            applyReaction: function (msgId, emojiId) {
-                var data = messagesById.get(msgId);
-                var current = data && data.reactions ? data.reactions[myEmailLower] : null;
-                var msgRef = doc.apply(null, [db].concat(collectionPath, [msgId]));
-                var fieldPath = new FieldPath('reactions', myEmailLower);
-                var value = (current === emojiId) ? deleteField() : emojiId;
-                updateDoc(msgRef, fieldPath, value).catch(function (e) {
-                    console.error('فشل تسجيل الرياكت:', e);
-                });
-            },
-            subscribe: function (onChange) {
-                var q = query(messagesColRef, orderBy('createdAt', 'asc'));
-                onSnapshot(q, function (snap) {
-                    messagesById = new Map(snap.docs.map(function (d) { return [d.id, d.data()]; }));
-                    onChange();
-                }, function (err) {
-                    console.error('فشل الاستماع لرياكتس الرسائل:', err);
-                });
-            }
-        };
-    }
-
-    function buildLocalAiBackend() {
-        var STORAGE_KEY = 'cz_ai_chat_history';
-        var MY_KEY = 'me';
-        var notify = null;
-
-        function readHistory() {
-            try {
-                var raw = localStorage.getItem(STORAGE_KEY);
-                return raw ? JSON.parse(raw) : [];
-            } catch (e) {
-                return [];
-            }
-        }
-        function writeHistory(list) {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-            } catch (e) {}
-        }
-        function findMsg(list, msgId) {
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].id === msgId) return list[i];
-            }
-            return null;
-        }
-
-        return {
-            myKey: MY_KEY,
-            getReactions: function (msgId) {
-                var msg = findMsg(readHistory(), msgId);
-                return (msg && msg.reactions) || null;
-            },
-            applyReaction: function (msgId, emojiId) {
-                var list = readHistory();
-                var msg = findMsg(list, msgId);
-                if (!msg) return;
-                if (!msg.reactions) msg.reactions = {};
-                var current = msg.reactions[MY_KEY];
-                if (current === emojiId) {
-                    delete msg.reactions[MY_KEY];
-                } else {
-                    msg.reactions[MY_KEY] = emojiId;
-                }
-                writeHistory(list);
-                // مفيش onSnapshot هنا (تخزين محلي)، فبننده على التغيير يدوي
-                if (notify) notify();
-            },
-            subscribe: function (onChange) {
-                notify = onChange;
-                onChange();
-                // لو اتغيّر الـ localStorage من تاب تاني مفتوح لنفس الشات
-                window.addEventListener('storage', function (e) {
-                    if (e.key === STORAGE_KEY) onChange();
-                });
-            }
-        };
-    }
-
-    function detectBackend() {
-        // 1) محادثة عادية (شخص لشخص)
-        var otherEmail = localStorage.getItem('cz_active_chat_email') || '';
-        if (myEmail && otherEmail) {
-            var chatId = [myEmail.toLowerCase(), otherEmail.toLowerCase()].sort().join('__');
-            return buildFirestoreBackend(['chats', chatId, 'messages']);
-        }
-        // 2) جروب
-        var groupId = localStorage.getItem('cz_active_group_id') || '';
-        if (myEmail && groupId) {
-            return buildFirestoreBackend(['groups', groupId, 'messages']);
-        }
-        // 3) شات الذكاء الاصطناعي — مفيش شرط إيميل/جروب، لكن لازم
-        // نتأكد إننا فعلاً في صفحة فيها الشكل بتاعها، وإلا منشتغلش
-        // في صفحة مش معروفة
-        if ($('convMessages') && (document.querySelector('.ai-chat-shell') || $('aiStatusText'))) {
-            return buildLocalAiBackend();
-        }
-        return null;
-    }
-
-    backend = detectBackend();
-    if (!backend) {
-        // مفيش سياق شات معروف (صفحة تانية) — مفيش داعي نكمل
+    var otherEmail = localStorage.getItem('cz_active_chat_email') || '';
+    if (!myEmail || !otherEmail) {
+        // مفيش محادثة محددة (مثلاً صفحة تانية) — مفيش داعي نكمل
         return;
     }
+    var myEmailLower = myEmail.toLowerCase();
+    var chatId = [myEmail.toLowerCase(), otherEmail.toLowerCase()].sort().join('__');
+    var messagesColRef = collection(db, 'chats', chatId, 'messages');
 
     /* ============ تحميل الـ manifest (نفس ملف الإيموجي التاني) ============ */
     var manifestData = null;
@@ -220,6 +92,9 @@ import {
             'background-position:-' + bgX + 'px -' + bgY + 'px;' +
             'background-size:' + bgW + 'px ' + bgH + 'px;"></span>';
     }
+
+    /* ============ تخزين آخر نسخة معروفة من رسائل المحادثة ============ */
+    var messagesById = new Map(); // msgId -> { reactions: {emailLower:emojiId}, ... }
 
     /* ============ صف الرياكت الجاهز (يتحط مرة واحدة جوه msgCtxMenu) ============ */
     var reactBar = null;
@@ -263,53 +138,29 @@ import {
         return bar;
     }
 
-    /* بنحسب مكان القايمة (Reply/Copy/...) وصف الرياكشن مع بعض
-       كخطوة واحدة، مش خطوتين منفصلتين — عشان الاتنين يطلعوا متلاصقين
-       صح فوق بعض من غير ما حد "يقفز" لمكان تاني بعد ما التاني
-       اتحط. المنطق:
-       1) نسيب القايمة في المكان اللي conversation.js حطها فيه أصلاً
-          (سواء تحت الفقاعة أو مقلوبة فوقها).
-       2) لو مفيش مكان كفاية فوق القايمة عشان صف الرياكشن يتحط
-          فوقها (يعني القايمة قريبة من حافة الشاشة العلوية)، بنرفع
-          الكومة كلها (القايمة + الصف) سوا لمنطقة مريحة من الشاشة
-          (قريب من النص) عشان الاتنين يفضلوا ظاهرين كاملين وملزقين
-          ببعض، بدل ما يتقطعوا أو يتلزقوا في الحافة. */
-    function positionReactBarAndMenu(bubbleRect) {
+    /* بنحط الصف عايم فوق فقاعة الرسالة بالظبط (مش جوه قايمة
+       Reply/Copy/...)، بنفس منطق تحديد المكان اللي القايمة نفسها
+       بتستخدمه (getBoundingClientRect + clamp جوه حدود الشاشة) */
+    function positionReactBar(bubbleRect) {
         if (!reactBar) return;
-        var menu = $('msgCtxMenu');
-        if (!menu || !menu.classList.contains('open')) return;
-
         reactBar.style.visibility = 'hidden';
         reactBar.classList.add('open');
-
+        var barRect = reactBar.getBoundingClientRect();
         var margin = 10;
         var gap = 10;
-        var menuRect = menu.getBoundingClientRect();
-        var barRect = reactBar.getBoundingClientRect();
-        var stackHeight = barRect.height + gap + menuRect.height;
-
-        var spaceAboveMenu = menuRect.top - margin;
-        var menuTop = menuRect.top;
-
-        if (spaceAboveMenu < barRect.height + gap) {
-            // مفيش مكان كفاية فوق القايمة عشان الصف يتحط فوقها —
-            // نرفع الكومة كلها (صف + قايمة) لمكان مريح في الشاشة
-            var idealTop = Math.max(margin, (window.innerHeight - stackHeight) / 2);
-            menuTop = Math.min(
-                idealTop,
-                window.innerHeight - stackHeight - margin
-            );
-            menuTop = Math.max(margin + barRect.height + gap, menuTop);
-            menu.style.top = menuTop + 'px';
+        var top = bubbleRect.top - barRect.height - gap;
+        if (top < margin) {
+            // مفيش مكان كفاية فوق (رسالة قريبة من أعلى الشاشة) —
+            // نحطه تحت الفقاعة بدل ما يتقطع
+            top = bubbleRect.bottom + gap;
         }
-
-        var barTop = menuTop - barRect.height - gap;
+        top = Math.min(Math.max(margin, top), window.innerHeight - barRect.height - margin);
         var center = bubbleRect.left + bubbleRect.width / 2;
         var left = Math.min(
             Math.max(margin, center - barRect.width / 2),
             window.innerWidth - barRect.width - margin
         );
-        reactBar.style.top = barTop + 'px';
+        reactBar.style.top = top + 'px';
         reactBar.style.left = left + 'px';
         reactBar.style.visibility = '';
     }
@@ -319,7 +170,7 @@ import {
         if (!rowEl) return;
         var bubble = rowEl.querySelector('.bubble');
         if (!bubble) return;
-        positionReactBarAndMenu(bubble.getBoundingClientRect());
+        positionReactBar(bubble.getBoundingClientRect());
         syncReactBarActiveState();
     }
 
@@ -341,8 +192,8 @@ import {
         if (!reactBar) return;
         var selectedRow = document.querySelector('.msg-row.selected');
         var msgId = selectedRow ? selectedRow.dataset.msgId : null;
-        var reactions = msgId ? backend.getReactions(msgId) : null;
-        var myCurrent = reactions ? reactions[backend.myKey] : null;
+        var data = msgId ? messagesById.get(msgId) : null;
+        var myCurrent = data && data.reactions ? data.reactions[myEmailLower] : null;
         reactBar.querySelectorAll('.cz-react-bar-cell').forEach(function (cell) {
             cell.classList.toggle('cz-active', !!myCurrent && cell.dataset.emojiId === myCurrent);
         });
@@ -363,10 +214,17 @@ import {
         return row ? row.dataset.msgId : null;
     }
 
-    /* ============ تسجيل / إلغاء / تغيير الرياكت ============ */
+    /* ============ تسجيل / إلغاء / تغيير الرياكت في Firestore ============ */
     function applyReaction(msgId, emojiId) {
         if (!msgId) return;
-        backend.applyReaction(msgId, emojiId);
+        var data = messagesById.get(msgId);
+        var current = data && data.reactions ? data.reactions[myEmailLower] : null;
+        var msgRef = doc(db, 'chats', chatId, 'messages', msgId);
+        var fieldPath = new FieldPath('reactions', myEmailLower);
+        var value = (current === emojiId) ? deleteField() : emojiId;
+        updateDoc(msgRef, fieldPath, value).catch(function (e) {
+            console.error('فشل تسجيل الرياكت:', e);
+        });
         if (navigator.vibrate) {
             try { navigator.vibrate(8); } catch (e) {}
         }
@@ -494,7 +352,8 @@ import {
     function renderBadgeForRow(rowEl, msgId) {
         var bubble = rowEl.querySelector('.bubble');
         if (!bubble) return;
-        var reactions = backend.getReactions(msgId) || {};
+        var data = messagesById.get(msgId);
+        var reactions = (data && data.reactions) || {};
         var entries = Object.keys(reactions).filter(function (k) { return reactions[k]; });
 
         // بصمة سريعة لمحتوى الرياكتس الحالي. لو نفس اللي كان موجود قبل
@@ -516,11 +375,11 @@ import {
         }
         if (!manifestData) return; // هيترندر تاني لما المانيفست يجهز (fp هتفضل __pending__)
 
-        // تجميع حسب نوع الإيموجي عشان لو أكتر من شخص اختار نفس الرياكت
+        // تجميع حسب نوع الإيموجي عشان لو الاتنين اختاروا نفس الرياكت
         var counts = {};
         var order = [];
-        entries.forEach(function (key) {
-            var id = reactions[key];
+        entries.forEach(function (email) {
+            var id = reactions[email];
             if (!counts[id]) { counts[id] = 0; order.push(id); }
             counts[id]++;
         });
@@ -567,6 +426,19 @@ import {
         mo.observe(container, { childList: true, subtree: true });
     }
 
+    /* ============ الاستماع لتحديثات الرسائل (للرياكتس فقط) ============ */
+    function watchMessagesData() {
+        var q = query(messagesColRef, orderBy('createdAt', 'asc'));
+        onSnapshot(q, function (snap) {
+            messagesById = new Map(snap.docs.map(function (d) { return [d.id, d.data()]; }));
+            renderAllBadges();
+            // لو القايمة مفتوحة دلوقتي على رسالة اتغيّر الرياكت بتاعها
+            syncReactBarActiveState();
+        }, function (err) {
+            console.error('فشل الاستماع لرياكتس الرسائل:', err);
+        });
+    }
+
     /* ============ نقطة الدخول ============ */
     function init() {
         loadManifest().then(function () {
@@ -575,10 +447,7 @@ import {
         });
         watchCtxMenu();
         watchMessagesContainer();
-        backend.subscribe(function () {
-            renderAllBadges();
-            syncReactBarActiveState();
-        });
+        watchMessagesData();
     }
 
     if (document.readyState === 'loading') {
